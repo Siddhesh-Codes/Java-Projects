@@ -23,7 +23,7 @@ public class SignUpOne extends JFrame {
 
     JRadioButton marriedRadioButton = new JRadioButton("Married");
     JRadioButton unmarriedRadioButton = new JRadioButton("Unmarried");
-
+    JRadioButton others = new JRadioButton("Other");
     // JCalender
     JDateChooser dateChooser = new JDateChooser();
 
@@ -79,10 +79,10 @@ public class SignUpOne extends JFrame {
         // DOB
         JLabel dateOfBirth = new JLabel("Date of Birth: ");
         dateOfBirth.setFont(new Font("Raleway", Font.BOLD, 18));
-        dateOfBirth.setBounds(100, 240, 200, 30);
+        dateOfBirth.setBounds(100, 240, 400, 30);
         add(dateOfBirth);
         // DOB Field
-        dateChooser.setBounds(300, 240, 200, 30);
+        dateChooser.setBounds(300, 240, 400, 30);
         dateChooser.setForeground(new Color(105, 105, 105));
         add(dateChooser);
 
@@ -107,6 +107,12 @@ public class SignUpOne extends JFrame {
         otherRadioButton.setBounds(510, 290, 100, 30);
         otherRadioButton.setBackground(Color.WHITE);
         add(otherRadioButton);
+
+        // Gender Button Group to select only one option
+        ButtonGroup genderGroup = new ButtonGroup();
+        genderGroup.add(maleRadioButton);
+        genderGroup.add(femaleRadioButton);
+        genderGroup.add(otherRadioButton);
 
 
         // E-Mail
@@ -134,6 +140,20 @@ public class SignUpOne extends JFrame {
         unmarriedRadioButton.setBounds(400, 390, 100, 30);
         unmarriedRadioButton.setBackground(Color.WHITE);
         add(unmarriedRadioButton);
+        // Other Radio Button
+        others.setFont(new Font("Raleway", Font.BOLD,14));
+        others.setBounds(510, 390, 100, 30);
+        others.setBackground(Color.WHITE);
+        add(others);
+
+        // Marital Status Button Group to select only one option
+        ButtonGroup maritalStatusGroup = new ButtonGroup();
+        maritalStatusGroup.add(marriedRadioButton);
+        maritalStatusGroup.add(unmarriedRadioButton);
+        maritalStatusGroup.add(others);
+
+
+
 
         // Address
         JLabel address = new JLabel("Address: ");
@@ -175,6 +195,15 @@ public class SignUpOne extends JFrame {
         pinCodeTxtField.setFont(new Font("Raleway", Font.BOLD, 14));
         pinCodeTxtField.setBounds(300, 590, 400, 30);
         add(pinCodeTxtField);
+
+
+        // Next Button
+        JButton nextButton = new JButton("Next");
+        nextButton.setFont(new Font("Raleway", Font.BOLD, 14));
+        nextButton.setBounds(620, 660, 80, 30);
+        nextButton.setBackground(Color.BLACK);
+        nextButton.setForeground(Color.WHITE);
+        add(nextButton);
 
 
         setSize(850, 800);
