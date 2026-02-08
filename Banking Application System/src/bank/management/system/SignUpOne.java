@@ -213,4 +213,5 @@ public class SignUpOne extends JFrame {
     static void main(String[] args) {
         new SignUpOne();
     }
+
 }
