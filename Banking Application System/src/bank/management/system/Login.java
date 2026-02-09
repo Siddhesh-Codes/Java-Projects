@@ -112,7 +112,10 @@ public class Login extends JFrame implements ActionListener {
             cardTextField.setText("");
             pinTextField.setText("");
         } else if (e.getSource() == signup){
+            SignUpOne signUp = new SignUpOne();
 
+            signUp.setVisible(true);
+            dispose();
         }
     }
     static void main(String[] args) {
