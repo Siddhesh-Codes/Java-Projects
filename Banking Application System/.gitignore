@@ -1,0 +1,7 @@
+# Ignore DBConnection.java file
+src/bank/management/system/DBConnection.java
+db.properties
+DBConnection.class
+*.class
+run.bat
+.gitignore

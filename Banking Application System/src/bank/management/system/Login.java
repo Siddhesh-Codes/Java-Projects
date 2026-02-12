@@ -4,80 +4,69 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class Login extends JFrame implements ActionListener {
 
     JButton login, clear, signup;
-    JLabel cardNo,pin;
+    JLabel cardNo, pin;
     JTextField cardTextField;
     JPasswordField pinTextField;
 
+    // ─── Brute Force Protection ────────────────────────────────────────
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+    private int failedAttempts = 0;
+    private long lockoutEndTime = 0;
+
     Login() {
-        // used to set the title of the frame
         setTitle("ATM MACHINE");
-
-        // used to prevent By Default layout.
         setLayout(null);
-
-        // used to terminate the Program when JFrame Window terminates
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        // used to set the size of the Frame
         setSize(800, 480);
-
-        // by default the frame is hidden from the
-        // user so we have to make it true so that use can see it.
         setVisible(true);
+        setLocation(350, 200);
 
-        // by default our frame opens at top left corner
-        // so to set it in the middle  we uses below function
-        setLocation(350,200);
-
-
-        // We cannot directly place the image on the window.
+        // Logo
         ImageIcon i1 = new ImageIcon(ClassLoader.getSystemResource("icons/logo.jpg"));
-        // to set the size of the placed image on the Window.
-        Image i2 = i1.getImage().getScaledInstance(100,100, Image.SCALE_DEFAULT);
-        // JLable is to place the actual image on the Window.
+        Image i2 = i1.getImage().getScaledInstance(100, 100, Image.SCALE_DEFAULT);
         ImageIcon i3 = new ImageIcon(i2);
         JLabel label = new JLabel(i3);
         label.setBounds(70, 10, 100, 100);
         add(label);
 
-        // JLabel used to add any content on the window
         // Welcome Message
         JLabel text = new JLabel("Welcome to ATM", SwingConstants.CENTER);
-        text.setBounds(200,40,400,40);
+        text.setBounds(200, 40, 400, 40);
         text.setFont(new Font("Onward", Font.BOLD, 20));
         add(text);
 
-        // Card No. text
+        // Card No
         cardNo = new JLabel("Card No:");
-        cardNo.setBounds(200,150,150,40);
+        cardNo.setBounds(200, 150, 150, 40);
         cardNo.setFont(new Font("Raleway", Font.BOLD, 20));
         add(cardNo);
 
-        // Card Np. Text Fields
         cardTextField = new JTextField();
-        cardTextField.setBounds(350,155,230,30);
+        cardTextField.setBounds(350, 155, 230, 30);
         cardTextField.setFont(new Font("Arial", Font.BOLD, 14));
         add(cardTextField);
 
-        //Enter Pin txt
+        // PIN
         pin = new JLabel("Enter Pin:");
-        pin.setBounds(200,200,150,40);
+        pin.setBounds(200, 200, 150, 40);
         pin.setFont(new Font("Raleway", Font.BOLD, 20));
         add(pin);
 
-        // Text Fields
         pinTextField = new JPasswordField();
-        pinTextField.setBounds(350,205,230,30);
+        pinTextField.setBounds(350, 205, 230, 30);
         pinTextField.setFont(new Font("Arial", Font.BOLD, 14));
         add(pinTextField);
 
-
-
-        // Buttons
         // Sign In Button
         login = new JButton("SIGN IN");
         login.setBounds(350, 300, 100, 30);
@@ -105,29 +94,119 @@ public class Login extends JFrame implements ActionListener {
         getContentPane().setBackground(Color.WHITE);
     }
 
-    // what we have to do when we click on the particular button
-    public void actionPerformed (ActionEvent e) {
+    @Override
+    public void actionPerformed(ActionEvent e) {
         if (e.getSource() == login) {
+            // ─── Check if account is locked out ────────────────────
+            if (System.currentTimeMillis() < lockoutEndTime) {
+                long remainingSeconds = (lockoutEndTime - System.currentTimeMillis()) / 1000;
+                JOptionPane.showMessageDialog(null,
+                        "Account temporarily locked due to too many failed attempts.\n"
+                                + "Please try again in " + remainingSeconds + " seconds.",
+                        "Account Locked", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            String cardNumber = DBConnection.sanitize(cardTextField.getText());
+            String pinInput = new String(pinTextField.getPassword());
+
+            // ─── Input Validation ──────────────────────────────────
+            if (cardNumber.isEmpty() || pinInput.isEmpty()) {
+                JOptionPane.showMessageDialog(null,
+                        "Please enter Card Number and PIN.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Card number: 16 digits only
+            if (!cardNumber.matches("^[0-9]{16}$")) {
+                JOptionPane.showMessageDialog(null,
+                        "Card Number must be exactly 16 digits.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // PIN: exactly 4 digits
+            if (!pinInput.matches("^[0-9]{4}$")) {
+                JOptionPane.showMessageDialog(null,
+                        "PIN must be exactly 4 digits.",
+                        "Validation Error", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // ─── Authenticate against signup table (hashed PIN) ────
+            try {
+                Connection conn = DBConnection.getConnection();
+                // Only fetch the hash and salt — never select * in production
+                String sql = "SELECT pin_hash, pin_salt FROM signup WHERE card_number = ?";
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, cardNumber);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            String storedHash = rs.getString("pin_hash");
+                            String storedSalt = rs.getString("pin_salt");
+
+                            // Verify PIN using constant-time comparison
+                            if (DBConnection.verifyPin(pinInput, storedHash, storedSalt)) {
+                                // Reset failed attempts on successful login
+                                failedAttempts = 0;
+                                JOptionPane.showMessageDialog(null,
+                                        "Login successful!",
+                                        "Welcome", JOptionPane.INFORMATION_MESSAGE);
+                                // TODO: Navigate to main dashboard
+                            } else {
+                                handleFailedLogin();
+                            }
+                        } else {
+                            // Don't reveal whether card exists or not (prevents enumeration)
+                            handleFailedLogin();
+                        }
+                    }
+                }
+            } catch (ClassNotFoundException | SQLException | IOException ex) {
+                JOptionPane.showMessageDialog(null,
+                        "An error occurred. Please try again later.",
+                        "Error", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            } finally {
+                // Clear PIN from memory immediately after use
+                pinTextField.setText("");
+            }
+
         } else if (e.getSource() == clear) {
             cardTextField.setText("");
             pinTextField.setText("");
-        } else if (e.getSource() == signup){
-            SignUpOne signUp = new SignUpOne();
 
-            signUp.setVisible(true);
+        } else if (e.getSource() == signup) {
+            setVisible(false);
             dispose();
+            new SignUpOne();
         }
     }
-    static void main(String[] args) {
-//        System.out.println("Hello World");
-        // to call the Constructor
-//        JFrame frame =  new JFrame("ATM MACHINE");
 
+    /**
+     * Handles a failed login attempt with brute force protection.
+     * Locks the account after MAX_LOGIN_ATTEMPTS consecutive failures.
+     */
+    private void handleFailedLogin() {
+        failedAttempts++;
+        int remaining = MAX_LOGIN_ATTEMPTS - failedAttempts;
+
+        if (failedAttempts >= MAX_LOGIN_ATTEMPTS) {
+            lockoutEndTime = System.currentTimeMillis() + LOCKOUT_DURATION_MS;
+            failedAttempts = 0; // Reset counter for next lockout period
+            JOptionPane.showMessageDialog(null,
+                    "Too many failed attempts. Account locked for 5 minutes.",
+                    "Account Locked", JOptionPane.ERROR_MESSAGE);
+        } else {
+            // Generic message — don't reveal if card number exists
+            JOptionPane.showMessageDialog(null,
+                    "Invalid Card Number or PIN.\n" + remaining + " attempt(s) remaining.",
+                    "Login Failed", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public static void main(String[] args) {
         new Login();
-
-//        Login log = new Login();
     }
 }
-
-
-
