@@ -359,4 +359,5 @@ public class SignUpOne extends JFrame {
     public static void main(String[] args) {
         new SignUpOne();
     }
+
 }
