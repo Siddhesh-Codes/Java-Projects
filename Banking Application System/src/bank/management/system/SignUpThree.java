@@ -223,7 +223,13 @@ public class SignUpThree extends JFrame implements ActionListener {
             // ─── Hash the PIN before storing ────────────────────────
             // Generate a unique salt for this user
             String salt = DBConnection.generateSalt();
-            String hashedPin = DBConnection.hashPin(rawPin, salt);
+            char[] pinChars = rawPin.toCharArray();
+            String hashedPin;
+            try {
+                hashedPin = DBConnection.hashPin(pinChars, salt);
+            } finally {
+                java.util.Arrays.fill(pinChars, '\0');
+            }
 
             try {
                 Connection conn = DBConnection.getConnection();

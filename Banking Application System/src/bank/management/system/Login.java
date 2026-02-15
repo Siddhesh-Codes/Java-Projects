@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 
 public class Login extends JFrame implements ActionListener {
 
@@ -108,68 +109,71 @@ public class Login extends JFrame implements ActionListener {
             }
 
             String cardNumber = DBConnection.sanitize(cardTextField.getText());
-            String pinInput = new String(pinTextField.getPassword());
+            char[] pinInput = pinTextField.getPassword();
 
-            // ─── Input Validation ──────────────────────────────────
-            if (cardNumber.isEmpty() || pinInput.isEmpty()) {
-                JOptionPane.showMessageDialog(null,
-                        "Please enter Card Number and PIN.",
-                        "Validation Error", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-
-            // Card number: 16 digits only
-            if (!cardNumber.matches("^[0-9]{16}$")) {
-                JOptionPane.showMessageDialog(null,
-                        "Card Number must be exactly 16 digits.",
-                        "Validation Error", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-
-            // PIN: exactly 4 digits
-            if (!pinInput.matches("^[0-9]{4}$")) {
-                JOptionPane.showMessageDialog(null,
-                        "PIN must be exactly 4 digits.",
-                        "Validation Error", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-
-            // ─── Authenticate against signup table (hashed PIN) ────
             try {
-                Connection conn = DBConnection.getConnection();
-                // Only fetch the hash and salt — never select * in production
-                String sql = "SELECT pin_hash, pin_salt FROM signup WHERE card_number = ?";
-                try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, cardNumber);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) {
-                            String storedHash = rs.getString("pin_hash");
-                            String storedSalt = rs.getString("pin_salt");
+                // ─── Input Validation ──────────────────────────────────
+                if (cardNumber.isEmpty() || pinInput.length == 0) {
+                    JOptionPane.showMessageDialog(null,
+                            "Please enter Card Number and PIN.",
+                            "Validation Error", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
 
-                            // Verify PIN using constant-time comparison
-                            if (DBConnection.verifyPin(pinInput, storedHash, storedSalt)) {
-                                // Reset failed attempts on successful login
-                                failedAttempts = 0;
-                                JOptionPane.showMessageDialog(null,
-                                        "Login successful!",
-                                        "Welcome", JOptionPane.INFORMATION_MESSAGE);
-                                // TODO: Navigate to main dashboard
+                // Card number: 16 digits only
+                if (!cardNumber.matches("^[0-9]{16}$")) {
+                    JOptionPane.showMessageDialog(null,
+                            "Card Number must be exactly 16 digits.",
+                            "Validation Error", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                // PIN: exactly 4 digits
+                if (!DBConnection.isValidPinFormat(pinInput)) {
+                    JOptionPane.showMessageDialog(null,
+                            "PIN must be exactly 4 digits.",
+                            "Validation Error", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                // ─── Authenticate against signup table (hashed PIN) ────
+                try {
+                    Connection conn = DBConnection.getConnection();
+                    // Only fetch the hash and salt — never select * in production
+                    String sql = "SELECT pin_hash, pin_salt FROM signup WHERE card_number = ?";
+                    try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                        ps.setString(1, cardNumber);
+                        try (ResultSet rs = ps.executeQuery()) {
+                            if (rs.next()) {
+                                String storedHash = rs.getString("pin_hash");
+                                String storedSalt = rs.getString("pin_salt");
+
+                                // Verify PIN using constant-time comparison
+                                if (DBConnection.verifyPin(pinInput, storedHash, storedSalt)) {
+                                    // Reset failed attempts on successful login
+                                    failedAttempts = 0;
+                                    // Navigate to main ATM transaction menu
+                                    setVisible(false);
+                                    dispose();
+                                    new Transactions(cardNumber);
+                                } else {
+                                    handleFailedLogin();
+                                }
                             } else {
+                                // Don't reveal whether card exists or not (prevents enumeration)
                                 handleFailedLogin();
                             }
-                        } else {
-                            // Don't reveal whether card exists or not (prevents enumeration)
-                            handleFailedLogin();
                         }
                     }
+                } catch (ClassNotFoundException | SQLException | IOException ex) {
+                    JOptionPane.showMessageDialog(null,
+                            "An error occurred. Please try again later.",
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
-            } catch (ClassNotFoundException | SQLException | IOException ex) {
-                JOptionPane.showMessageDialog(null,
-                        "An error occurred. Please try again later.",
-                        "Error", JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
             } finally {
-                // Clear PIN from memory immediately after use
+                // Zero out PIN from memory immediately
+                if (pinInput != null) Arrays.fill(pinInput, '\0');
                 pinTextField.setText("");
             }
 

@@ -218,15 +218,15 @@ public class SignUpTwo extends JFrame implements ActionListener {
 
             try {
                 Connection conn = DBConnection.getConnection();
-                String sql = "UPDATE signup SET religion = ?, category = ?, income = ?, education = ?, occupation = ?, pan_number = ?, aadhar_number = ?, senior_citizen = ?, existing_account = ? WHERE form_no = ?";
+                String sql = "UPDATE signup SET religion = ?, category = ?, income = ?, education = ?, occupation = ?, pan_number_hash = ?, aadhar_number_hash = ?, senior_citizen = ?, existing_account = ? WHERE form_no = ?";
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
                     ps.setString(1, religion);
                     ps.setString(2, category);
                     ps.setString(3, income);
                     ps.setString(4, education);
                     ps.setString(5, occupation);
-                    ps.setString(6, pan.toUpperCase());
-                    ps.setString(7, aadhar);
+                    ps.setString(6, DBConnection.hmacHash(pan.toUpperCase()));
+                    ps.setString(7, DBConnection.hmacHash(aadhar));
                     ps.setString(8, seniorCitizen);
                     ps.setString(9, existingAccount);
                     ps.setString(10, formNo);
