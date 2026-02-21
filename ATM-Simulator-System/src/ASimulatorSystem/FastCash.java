@@ -114,3 +114,6 @@ public class FastCash extends JFrame implements ActionListener {
         new FastCash("").setVisible(true);
     }
 }
+
+
+
